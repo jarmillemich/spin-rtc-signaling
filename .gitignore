@@ -1,0 +1,5 @@
+target/
+.spin/
+
+# Place your own redis connection string in this file
+redis.env

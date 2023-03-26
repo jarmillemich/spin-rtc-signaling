@@ -1,0 +1,2 @@
+Word lists for name generation are from https://github.com/mewo2/syllpos/tree/master/wordlists
+TODO remove hard-to-spell items, and anything that can make unfortunate combinations

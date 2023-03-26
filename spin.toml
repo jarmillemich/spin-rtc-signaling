@@ -1,0 +1,15 @@
+spin_manifest_version = "1"
+authors = ["Jarmille <jarmille@umich.edu>"]
+description = "Signaling server for WebRTC"
+name = "rust-signaling"
+trigger = { type = "http", base = "/" }
+version = "0.1.0"
+
+[[component]]
+id = "rust-signaling"
+source = "target/wasm32-wasi/release/rust_signalling.wasm"
+allowed_http_hosts = []
+[component.trigger]
+route = "/..."
+[component.build]
+command = "cargo build --target wasm32-wasi --release"
