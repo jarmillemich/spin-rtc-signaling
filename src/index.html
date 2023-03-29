@@ -33,7 +33,9 @@
          * @param {string} msg
          */
         function log(msg) {
-            document.getElementById('log').innerText += msg + '\n'
+            let el = document.getElementById('log')
+            el.innerText += msg + '\n'
+            el.scrollTo({ top: el.scrollHeight })
         }
 
         /**
@@ -124,6 +126,18 @@
             /** @type {Map<string, ClientConnection>} */
             let clients = new Map()
 
+            function onMessage(client, message) {
+                let formatted = `${client.client_name}: ${message}`
+
+                log(formatted)
+
+                // Forward to everyone else
+                for (let otherClient of clients.values()) {
+                    if (otherClient === client) continue
+                    otherClient.dc?.send(formatted)
+                }
+            }
+
             // Start polling for client info
             for(let i = 0; i < 10; i++) {
                 await delay(1000);
@@ -141,7 +155,7 @@
                     if (message.type === 'start_join') {
                         let { client_name, client_offer } = message
                         log(`Got join request from ${client_name}`)
-                        let client = new ClientConnection(client_name, client_offer)
+                        let client = new ClientConnection(client_name, onMessage)
                         clients.set(client_name, client)
                         let answer = await client.connectToOffer(JSON.parse(client_offer))
                         log('Sending answer')
@@ -191,10 +205,18 @@
                 }
                 log('Got hosting messages ' + messages.length)
             }
+
+            attachChat(msg => {
+                let formatted = `Host: ${msg}`
+
+                for (let client of clients.values()) {
+                    client.dc?.send(formatted)
+                }
+            })
         }
 
         class ClientConnection {
-            constructor(client_name) {
+            constructor(client_name, messageCallback) {
                 this.client_name = client_name
 
                 this.connection = new RTCPeerConnection({
@@ -208,6 +230,9 @@
                 }
 
                 this.iceGather = gatherIceCandidates(this.connection)
+
+                this.dc = null
+                this.messageCallback = messageCallback
             }
 
             /** Connects our connection the given offer, sets up an ICE channel, and returns an answer */
@@ -226,7 +251,9 @@
             onDataChannel(dc) {
                 log('Got data channel!')
                 dc.send('hello from the server')
-                dc.onmessage = message => log(`Message from ${this.client_name}: ${message.data}`)
+                dc.onmessage = message => this.messageCallback(this, message.data)
+
+                this.dc = dc;
             }
         }
 
@@ -342,10 +369,33 @@
 
             if (connected) {
                 log('Client side is good to go!')
+                attachChat(msg => channel.send(msg))
             } else {
                 log('Giving up!')
             }
 
+        }
+
+        /**
+         * Attach our input control to do some chat over the given channel
+         * @param {(string) => void)} cb
+         */
+        function attachChat(cb) {
+            /** @type {HTMLInputElement} */
+            let el = document.getElementById('chatty')
+            el.disabled = false;
+
+            el.addEventListener('keydown', evt => {
+                if (evt.key === 'Enter') {
+                    let msg = el.value
+                    el.value = ''
+
+                    log(`-> ${msg}`)
+                    cb(msg)
+                }
+            })
+
+            el.focus()
         }
     </script>
     <link
@@ -370,9 +420,9 @@
         }
     </style>
 </head>
-<body class="d-flex flex-column">
-    <div class="buttons d-flex flex-row">
-        <div class="button-group p-3 d-flex flex-column">
+<body class="d-flex flex-column p-3">
+    <div class="buttons d-flex flex-row mb-3">
+        <div class="button-group me-3 d-flex flex-column">
             <button id="btn-host" class="btn btn-success">Request new session</button>
             
             <div class="form-check">
@@ -381,12 +431,15 @@
             </div>
         </div>
 
-        <div class="button-group p-3 d-flex flex-column">
+        <div class="button-group me-3 d-flex flex-column">
             <input type="text" id="txt-join-name" placeholder="Session name to join" />
             <input type="text" id="txt-join-client" placeholder="Client Name" />
             <button class="btn btn-success" id="btn-join">Join session</button>
         </div>
     </div>
+
     <pre id="log" class="bg-white text-black col"></pre>
+
+    <input id="chatty" type="text" disabled class="mb-3" />
 </body>
 </html>
