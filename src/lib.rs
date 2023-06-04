@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use http::Method;
+use http::{Method, HeaderValue};
 use serde_json::{Value, json};
 use spin_sdk::{
     http::{Request, Response},
@@ -19,7 +19,7 @@ use random_util::generate_name;
 /// A simple Spin HTTP component.
 #[http_component]
 fn handle_rust_signaling(req: Request) -> Result<Response> {
-    match (req.method(), req.uri().path()) {
+    let res = match (req.method(), req.uri().path()) {
         (&Method::GET, "/") => Ok(http::Response::builder().status(200).body(Some(include_str!("./index.html").into()))?),
         (&Method::GET, "/test") => test_route(),
 
@@ -41,7 +41,12 @@ fn handle_rust_signaling(req: Request) -> Result<Response> {
         
 
         _ => Ok(http::Response::builder().status(404).body(Some("Not found".into()))?)
-    }
+    };
+
+    res.map(|mut res| {
+        res.headers_mut().append("Access-Control-Allow-Origin", HeaderValue::from_str("*").unwrap());
+        res
+    })
 }
 
 /*
